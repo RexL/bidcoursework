@@ -26,21 +26,27 @@ df_validate = subset(df_validate, select=-c(bidid, logtype, userid, IP, domain, 
 levels(df_train$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
 levels(df_validate$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
 
-#Frequency for weekdays
-weekday_freq = count(df_train, vars="weekday")
-df_train$weekdayfreq = weekday_freq[match(df_train$weekday, weekday_freq$weekday),2]
 
-#CTR for weekdays
-weekday_click_freq = count(df_train, c("weekday", "click"))
-weekday_click_freq = weekday_click_freq[(weekday_click_freq$click=="1"),]
-weekday_click_freq$ctr = 100 * weekday_click_freq$freq/weekday_freq[match(weekday_click_freq$weekday, weekday_freq$weekday),2]
-df_train$weekdayctr = weekday_click_freq[match(df_train$weekday, weekday_click_freq$weekday),4]
+CreateNumericParametersFromFactor <- function(df_train, parameter_name) {
+  #Frequency
+  freq = count(df_train, vars=parameter_name)
+  freq_name = paste (parameter_name, "freq", sep = "") 
+  df_train[freq_name] = freq[match(df_train[[parameter_name]], freq[[parameter_name]]),2]
+  
+  #CTR
+  click_freq = count(df_train, c(parameter_name, "click"))
+  click_freq = click_freq[(click_freq$click=="1"),]
+  click_freq$ctr = 100 * click_freq$freq/freq[match(click_freq[[parameter_name]], freq[[parameter_name]]),2]
+  ctr_name = paste (parameter_name, "ctr", sep = "")
+  df_train[ctr_name] = click_freq[match(df_train[[parameter_name]], click_freq[[parameter_name]]),4]
+  
+  return(df_train)
+}
+
+#Parameters for weekdays
+df_train = CreateNumericParametersFromFactor(df_train, "weekday")
 
 #WriteSolutionCsv(labels_train, df_train)
-
-
-
-
 
 WriteSolutionCsv <- function(labels_train) {
   
