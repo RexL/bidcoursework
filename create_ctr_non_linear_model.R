@@ -4,28 +4,32 @@ library(car)
 library(plyr) #for count()
 library(xgboost)
 
-FACTOR_PARAMETERS = c("weekday", "hour", "useragent", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser")
+FACTOR_PARAMETERS = c("weekday", "hour", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser", "os", "browser")
 
 GetDataMatrix <- function(data_frame){
   
   #remove logs with bidprice lower or equal to payprice
-  data_frame = subset(data_frame, bidprice>payprice)
+  data_frame = subset(data_frame, bidprice>payprice);
   
   #Group levels of slotvisibility: 0->FirstView, 1->SecondView, 2->ThirdView
-  levels(data_frame$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
+  levels(data_frame$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView");
+  
+  m_os_and_browser = str_split_fixed(data_frame$useragent, "_", 2)
+  colnames(m_os_and_browser) = cbind("os", "browser")
+  data_frame = cbind(data_frame, m_os_and_browser)
   
   #Create matrix with parameters that don't need transformation
   m_data = as.matrix(subset(data_frame, select=c(slotwidth, slotheight, slotprice)));
   
   for(parameter in FACTOR_PARAMETERS){
-    m_data = TransformFactorParameterToNumeric(data_frame, m_data, parameter)  
+    m_data = TransformFactorParameterToNumeric(data_frame, m_data, parameter);  
   }
   
-  m_labels = as.matrix(data_frame['click'])
+  m_labels = as.matrix(data_frame['click']);
   
-  dmatrix = xgb.DMatrix(data = m_data, label= m_labels)
+  dmatrix = xgb.DMatrix(data = m_data, label= m_labels);
   
-  return(class(dmatrix))
+  return(dmatrix)
 }
 
 TransformFactorParameterToNumeric <- function(df_train, m_train, parameter_name) {
@@ -68,8 +72,8 @@ df_validate = read.csv("Dataset/validation.csv", colClasses=c(rep('factor', 15),
 
 dm_train = GetDataMatrix(df_train)
 dm_validate = GetDataMatrix(df_validate)
-dmwatchlist = list(train=dm_train, test=dm_validate)
+watchlist = list(train=dm_train, test=dm_validate)
 
-ctr_model = xgb.train(data = dm_train, max.depth = 2, eta = 1, nround = 2, nthread = 2, watchlist= watchlist, objective = "binary:logistic")
+ctr_model = xgb.train(data = dm_train, max.depth = 4, eta = 0.1, nround = 200, nthread = 4, watchlist= watchlist, verbose = 1, eval.metric = "error", eval.metric = "rmse", eval.metric = "auc", objective = "binary:logistic")
 
 #WriteSolutionCsv(labels_train, df_train)
