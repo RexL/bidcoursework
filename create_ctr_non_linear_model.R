@@ -4,8 +4,31 @@ library(car)
 library(plyr) #for count()
 library(xgboost)
 
+FACTOR_PARAMETERS = c("weekday", "hour", "useragent", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser")
 
-CreateNumericParametersFromFactor <- function(df_train, m_train, parameter_name) {
+GetDataMatrix <- function(data_frame){
+  
+  #remove logs with bidprice lower or equal to payprice
+  data_frame = subset(data_frame, bidprice>payprice)
+  
+  #Group levels of slotvisibility: 0->FirstView, 1->SecondView, 2->ThirdView
+  levels(data_frame$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
+  
+  #Create matrix with parameters that don't need transformation
+  m_data = as.matrix(subset(data_frame, select=c(slotwidth, slotheight, slotprice)));
+  
+  for(parameter in FACTOR_PARAMETERS){
+    m_data = TransformFactorParameterToNumeric(data_frame, m_data, parameter)  
+  }
+  
+  m_labels = as.matrix(data_frame['click'])
+  
+  dmatrix = xgb.DMatrix(data = m_data, label= m_labels)
+  
+  return(class(dmatrix))
+}
+
+TransformFactorParameterToNumeric <- function(df_train, m_train, parameter_name) {
   #Frequency
   freq = count(df_train, vars=parameter_name)
   freq_name = paste (parameter_name, "freq", sep = "") 
@@ -43,33 +66,10 @@ setwd("D:/SSE/Web_Economics/Coursework")
 df_train = read.csv("Dataset/train.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
 df_validate = read.csv("Dataset/validation.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
 
-#remove logs with bidprice lower or equal to payprice
-df_train = filter(df_train, bidprice>payprice)
-df_validate = filter(df_validate, bidprice>payprice)
+dm_train = GetDataMatrix(df_train)
+dm_validate = GetDataMatrix(df_validate)
+dmwatchlist = list(train=dm_train, test=dm_validate)
 
-#Group levels of slotvisibility: 0->FirstView, 1->SecondView, 2->ThirdView
-levels(df_train$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
-levels(df_validate$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
-
-m_train = as.matrix(subset(df_train, select=c(slotwidth, slotheight, slotprice)))
-
-#Transform categoric parameters to numeric
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "weekday")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "hour")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "useragent")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "region")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "city")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "adexchange")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "slotvisibility")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "slotformat")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "keypage")
-m_train = CreateNumericParametersFromFactor(df_train, m_train, "advertiser")
-
-#extract 'click' values as labels from train and validate
-labels_train = as.matrix(df_train['click'])
-labels_validate = as.matrix(df_validate['click'])
-
-ctr_model <- xgboost(data = m_train, label = labels_train, max.depth = 2, eta = 1, nround = 2, nthread = 2, objective = "binary:logistic")
+ctr_model = xgb.train(data = dm_train, max.depth = 2, eta = 1, nround = 2, nthread = 2, watchlist= watchlist, objective = "binary:logistic")
 
 #WriteSolutionCsv(labels_train, df_train)
-
