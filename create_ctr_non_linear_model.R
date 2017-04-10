@@ -6,7 +6,7 @@ library(xgboost)
 
 FACTOR_PARAMETERS = c("weekday", "hour", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser", "os", "browser")
 
-GetDataMatrix <- function(data_frame){
+TransformDataFrame <- function(data_frame){
   
   #remove logs with bidprice lower or equal to payprice
   data_frame = subset(data_frame, bidprice>payprice);
@@ -18,36 +18,29 @@ GetDataMatrix <- function(data_frame){
   colnames(m_os_and_browser) = cbind("os", "browser")
   data_frame = cbind(data_frame, m_os_and_browser)
   
-  #Create matrix with parameters that don't need transformation
-  m_data = as.matrix(subset(data_frame, select=c(slotwidth, slotheight, slotprice)));
+  data_frame = TransformFactorParameterToNumeric(data_frame, "weekday");
   
   for(parameter in FACTOR_PARAMETERS){
-    m_data = TransformFactorParameterToNumeric(data_frame, m_data, parameter);  
+    data_frame = TransformFactorParameterToNumeric(data_frame, parameter);  
   }
   
-  m_labels = as.matrix(data_frame['click']);
-  
-  dmatrix = xgb.DMatrix(data = m_data, label= m_labels);
-  
-  return(dmatrix)
+  return(data_frame)
 }
 
-TransformFactorParameterToNumeric <- function(df_train, m_train, parameter_name) {
+TransformFactorParameterToNumeric <- function(data_frame, parameter_name) {
   #Frequency
-  freq = count(df_train, vars=parameter_name)
+  freq = count(data_frame, vars=parameter_name)
   freq_name = paste (parameter_name, "freq", sep = "") 
-  m_train = cbind(m_train, freq[match(df_train[[parameter_name]], freq[[parameter_name]]),2])
-  colnames(m_train)[NCOL(m_train)] = freq_name
+  data_frame[[freq_name]] = freq[match(data_frame[[parameter_name]], freq[[parameter_name]]),2]
   
   #CTR
-  click_freq = count(df_train, c(parameter_name, "click"))
+  click_freq = count(data_frame, c(parameter_name, "click"))
   click_freq = click_freq[(click_freq$click=="1"),]
   click_freq$ctr = 100 * click_freq$freq/freq[match(click_freq[[parameter_name]], freq[[parameter_name]]),2]
   ctr_name = paste (parameter_name, "ctr", sep = "")
-  m_train = cbind(m_train, click_freq[match(df_train[[parameter_name]], click_freq[[parameter_name]]),4])
-  colnames(m_train)[NCOL(m_train)] = ctr_name
+  data_frame[[ctr_name]] = click_freq[match(data_frame[[parameter_name]], click_freq[[parameter_name]]),4]
   
-  return(m_train)
+  return(data_frame)
 }
 
 WriteSolutionCsv <- function(labels_train) {
@@ -66,14 +59,25 @@ WriteSolutionCsv <- function(labels_train) {
 
 setwd("D:/SSE/Web_Economics/Coursework")
 
-#Read csv files
 df_train = read.csv("Dataset/train.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
 df_validate = read.csv("Dataset/validation.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
 
-dm_train = GetDataMatrix(df_train)
-dm_validate = GetDataMatrix(df_validate)
+df_train = TransformDataFrame(df_train)
+
+m_data_train = as.matrix(subset(df_train, select=c(slotwidth, slotheight, slotprice, weekdayfreq, hourfreq, regionfreq, cityfreq, adexchangefreq, slotvisibilityfreq, slotformatfreq, keypagefreq, advertiserfreq, osfreq, browserfreq, weekdayctr, hourctr, regionctr, cityctr, adexchangectr, slotvisibilityctr, slotformatctr, keypagectr, advertiserctr, osctr, browserctr)))
+m_labels_train = as.matrix(df_train['click']);
+dm_train = xgb.DMatrix(data = m_data_train, label= m_labels_train);
+
+df_validate = TransformDataFrame(df_validate)
+
+m_data_validate = as.matrix(subset(df_validate, select=c(slotwidth, slotheight, slotprice, weekdayfreq, hourfreq, regionfreq, cityfreq, adexchangefreq, slotvisibilityfreq, slotformatfreq, keypagefreq, advertiserfreq, osfreq, browserfreq, weekdayctr, hourctr, regionctr, cityctr, adexchangectr, slotvisibilityctr, slotformatctr, keypagectr, advertiserctr, osctr, browserctr)))
+m_labels_validate = as.matrix(df_validate['click']);
+dm_validate = xgb.DMatrix(data = m_data_validate, label= m_labels_validate);
+
 watchlist = list(train=dm_train, test=dm_validate)
 
-ctr_model = xgb.train(data = dm_train, max.depth = 4, eta = 0.1, nround = 200, nthread = 4, watchlist= watchlist, verbose = 1, eval.metric = "error", eval.metric = "rmse", eval.metric = "auc", objective = "binary:logistic")
+pctr_model = xgb.train(data = dm_train, max.depth = 4, eta = 0.1, nround = 200, nthread = 4, watchlist= watchlist, verbose = 1, eval.metric = "error", eval.metric = "rmse", eval.metric = "auc", objective = "binary:logistic")
+
+pctr = predict(pctr_model, m_data_validate)
 
 #WriteSolutionCsv(labels_train, df_train)
