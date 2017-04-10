@@ -1,12 +1,7 @@
-library(stringr)
-library(caret)
-library(car)
-library(plyr) #for count()
-library(xgboost)
+
 
 FACTOR_PARAMETERS = c("weekday", "hour", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser", "os", "browser")
-LIMIT_BUDGET = 6250
-BASE_BID = 0.7
+LIMIT_BUDGET = 25000
 
 TransformDataFrame <- function(data_frame){
   
@@ -45,6 +40,19 @@ TransformFactorParameterToNumeric <- function(data_frame, parameter_name) {
   return(data_frame)
 }
 
+EvaluateModel <- function(base_bid, pctr, average_ctr_train, df_evaluate) {
+  
+  our_bid_price = base_bid*(pctr/average_ctr_train);
+  
+  impressions = sum(our_bid_price > df_evaluate$payprice);
+  cost = sum((our_bid_price > df_evaluate$payprice)*df_evaluate$payprice)/1000;
+  clicks = sum((our_bid_price> df_evaluate$payprice)*(df_evaluate$click=="1"));
+  ctr = clicks/impressions;
+  cpc = cost/clicks;
+  
+  return(data.frame(base_bid, impressions, cost, clicks, ctr, cpc));
+}
+
 WriteSolutionCsv <- function(labels_train) {
   
   df_test = read.csv("Dataset/test.csv", colClasses=c(rep('factor', 18), rep('factor', 4)))
@@ -80,12 +88,15 @@ pctr_model = xgb.train(data = dm_train, max.depth = 4, eta = 0.1, nround = 200, 
 pctr = predict(pctr_model, m_data_validate)
 
 average_ctr_train = sum(m_labels_train==1)/nrow(m_labels_train)
-our_bid_price = BASE_BID*(pctr/average_ctr_train);
 
-impressions = sum(our_bid_price > df_validate$payprice)
-cost = sum((our_bid_price > df_validate$payprice)*df_validate$payprice)/1000
-clicks = sum((our_bid_price> df_validate$payprice)*(df_validate$click=="1"))
-ctr = clicks/impressions
-cpc = cost/clicks
+evaluation = data.frame(base_bid=double(), impressions=integer(), cost=double(), clicks=integer(), ctr=double(), cpc=double())
+
+for(base_bid in seq(from=0.4, to=100, by=0.1)){
+
+  evaluation = merge(evaluation, EvaluateModel(base_bid, pctr, average_ctr_train, df_validate), all = TRUE);
+    
+}
+
+write.csv(evaluation, file = "Evaluation.csv", row.names = FALSE, quote=FALSE)
 
 #WriteSolutionCsv(labels_train, df_train)
