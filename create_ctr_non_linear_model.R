@@ -5,6 +5,8 @@ library(plyr) #for count()
 library(xgboost)
 
 FACTOR_PARAMETERS = c("weekday", "hour", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser", "os", "browser")
+LIMIT_BUDGET = 6250
+BASE_BID = 0.7
 
 TransformDataFrame <- function(data_frame){
   
@@ -47,9 +49,6 @@ WriteSolutionCsv <- function(labels_train) {
   
   df_test = read.csv("Dataset/test.csv", colClasses=c(rep('factor', 18), rep('factor', 4)))
   levels(df_test$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
-  
-  limit_budget = 25000
-  base_bid = 25
   average_ctr_train = sum(with(labels_train, click==1))/nrow(labels_train)
   bidprice = base_bid/average_ctr_train * test_predict
   df_submission = data_frame(df_test$bidid, bidprice)
@@ -79,5 +78,14 @@ watchlist = list(train=dm_train, test=dm_validate)
 pctr_model = xgb.train(data = dm_train, max.depth = 4, eta = 0.1, nround = 200, nthread = 4, watchlist= watchlist, verbose = 1, eval.metric = "error", eval.metric = "rmse", eval.metric = "auc", objective = "binary:logistic")
 
 pctr = predict(pctr_model, m_data_validate)
+
+average_ctr_train = sum(m_labels_train==1)/nrow(m_labels_train)
+our_bid_price = BASE_BID*(pctr/average_ctr_train);
+
+impressions = sum(our_bid_price > df_validate$payprice)
+cost = sum((our_bid_price > df_validate$payprice)*df_validate$payprice)/1000
+clicks = sum((our_bid_price> df_validate$payprice)*(df_validate$click=="1"))
+ctr = clicks/impressions
+cpc = cost/clicks
 
 #WriteSolutionCsv(labels_train, df_train)
