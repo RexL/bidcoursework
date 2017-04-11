@@ -21,8 +21,8 @@ EvaluateModel <- function(base_bid, pctr, average_ctr_train, df_evaluate) {
 setwd("D:/SSE/Web_Economics/Coursework")
 
 #Read csv files
-df_train = read.csv("Dataset/train.csv", colClasses=c(rep('factor', 19), 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
-df_validate = read.csv("Dataset/validation.csv", colClasses=c(rep('factor', 19), 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
+df_train = read.csv("Dataset/train.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
+df_validate = read.csv("Dataset/validation.csv", colClasses=c(rep('factor', 15), 'numeric', 'numeric', 'factor', 'factor', 'numeric', 'factor', 'numeric', 'numeric', rep('factor', 3)))
 
 #remove logs with bidprice lower or equal to payprice
 df_train = filter(df_train, bidprice>payprice)
@@ -31,10 +31,6 @@ df_validate = filter(df_validate, bidprice>payprice)
 #extract 'click' values as labels from train and validate
 labels_train = df_train['click']
 labels_validate = df_validate['click']
-
-#remove unused columns
-df_train = subset(df_train, select=-c(click, bidid, logtype, userid, region, city, url, urlid, slotprice, bidprice, payprice, keypage, usertag))
-df_validate = subset(df_validate, select=-c(click, bidid, logtype, userid, region, city, url, urlid, slotprice, bidprice, payprice, keypage, usertag))
 
 #Group levels of slotvisibility: 0->FirstView, 1->SecondView, 2->ThirdView
 levels(df_train$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
