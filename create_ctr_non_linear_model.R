@@ -1,4 +1,8 @@
-
+library(stringr)
+library(caret)
+library(car)
+library(plyr) #for count()
+library(xgboost)
 
 FACTOR_PARAMETERS = c("weekday", "hour", "region", "city", "adexchange", "slotvisibility", "slotformat", "keypage", "advertiser", "os", "browser")
 LIMIT_BUDGET = 25000
@@ -97,6 +101,6 @@ for(base_bid in seq(from=0.4, to=100, by=0.1)){
     
 }
 
-write.csv(evaluation, file = "Evaluation.csv", row.names = FALSE, quote=FALSE)
+write.csv(evaluation, file = "Evaluation_non_linear.csv", row.names = FALSE, quote=FALSE)
 
 #WriteSolutionCsv(labels_train, df_train)
