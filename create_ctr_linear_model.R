@@ -4,6 +4,20 @@ library(car)
 library(dplyr)
 library(ROCR) #analyse performance of model
 
+
+EvaluateModel <- function(base_bid, pctr, average_ctr_train, df_evaluate) {
+  
+  our_bid_price = base_bid*(pctr/average_ctr_train);
+  
+  impressions = sum(our_bid_price > df_evaluate$payprice);
+  cost = sum((our_bid_price > df_evaluate$payprice)*df_evaluate$payprice)/1000;
+  clicks = sum((our_bid_price> df_evaluate$payprice)*(df_evaluate$click=="1"));
+  ctr = clicks/impressions;
+  cpc = cost/clicks;
+  
+  return(data.frame(base_bid, impressions, cost, clicks, ctr, cpc));
+}
+
 setwd("D:/SSE/Web_Economics/Coursework")
 
 #Read csv files
@@ -30,16 +44,27 @@ levels(df_validate$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "
 model = glm(unlist(labels_train) ~weekday+hour+slotvisibility+advertiser,family=binomial(link='logit'),data=df_train)
 
 #predict click for validate dataset
-p = predict(model, newdata = df_validate, type="response")
+pctr = predict(model, newdata = df_validate, type="response")
 
 #analyse performance
-pr = prediction(p, labels_validate)
+pr = prediction(pctr, labels_validate)
 prf = performance(pr, measure = "tpr", x.measure="fpr")
 
 plot(prf)
 auc = performance(pr, measure = "auc")
 auc = auc@y.values[[1]]
 auc
+
+average_ctr_train = sum(labels_train==1)/nrow(labels_train)
+evaluation = data.frame(base_bid=double(), impressions=integer(), cost=double(), clicks=integer(), ctr=double(), cpc=double())
+
+for(base_bid in seq(from=0.4, to=100, by=0.1)){
+  
+  evaluation = merge(evaluation, EvaluateModel(base_bid, pctr, average_ctr_train, df_validate), all = TRUE);
+  
+}
+
+write.csv(evaluation, file = "Evaluation_linear.csv", row.names = FALSE, quote=FALSE)
 
 df_test = read.csv("Dataset/test.csv", colClasses=c(rep('factor', 18), rep('factor', 4)))
 levels(df_test$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
