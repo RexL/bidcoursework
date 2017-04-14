@@ -33,6 +33,7 @@ labels_train = df_train['click']
 labels_validate = df_validate['click']
 
 #Group levels of slotvisibility: 0->FirstView, 1->SecondView, 2->ThirdView
+#because originally it was 0 , 1 , 2, 225 , FifthView, FirstView, etc, by change the frist four into FirstView, Secondview, ThirdView, Na, we have more data to look at
 levels(df_train$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
 levels(df_validate$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
 
