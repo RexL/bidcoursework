@@ -18,6 +18,21 @@ EvaluateModel <- function(base_bid, pctr, average_ctr_train, df_evaluate) {
   return(data.frame(base_bid, impressions, cost, clicks, ctr, cpc));
 }
 
+
+WriteSolutionCsv <- function(model, average_ctr_train, base_bid) {
+  
+  df_test = read.csv("Dataset/test.csv", colClasses=c(rep('factor', 18), rep('factor', 4)))
+  levels(df_test$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
+  
+  test_predict = predict(model, newdata = df_test, type="response")
+  
+  bidprice = base_bid/average_ctr_train * test_predict
+  
+  df_submission = data_frame(df_test$bidid, bidprice)
+  colnames(df_submission) <- c("bidid","bidprice")
+  write.csv(df_submission, file = "Submission.csv", row.names = FALSE, quote=FALSE)
+}
+
 setwd("D:/SSE/Web_Economics/Coursework")
 
 #Read csv files
@@ -63,16 +78,5 @@ for(base_bid in seq(from=0.4, to=100, by=0.1)){
 
 write.csv(evaluation, file = "Evaluation_linear.csv", row.names = FALSE, quote=FALSE)
 
-df_test = read.csv("Dataset/test.csv", colClasses=c(rep('factor', 18), rep('factor', 4)))
-levels(df_test$slotvisibility) = c("FirstView", "SecondView", "ThirdView", "Na", "FifthView", "FirstView", "FourthView", "Na", "OtherView", "SecondView", "ThirdView")
-
-test_predict = predict(model, newdata = df_test, type="response")
-
-limit_budget = 25000
-base_bid = 25
-average_ctr_train = sum(with(labels_train, click==1))/nrow(df_train)
-bidprice = base_bid/average_ctr_train * test_predict
-df_submission = data_frame(df_test$bidid, bidprice)
-colnames(df_submission) <- c("bidid","bidprice")
-write.csv(df_submission, file = "Submission.csv", row.names = FALSE, quote=FALSE)
+WriteSolutionCsv(model, average_ctr_train, 25)
 
